@@ -1,0 +1,20 @@
+idf_component_register(
+    SRCS
+        "app_main.c"
+        "bemfa_notifier.c"
+        "display.c"
+        "sensors.c"
+        "wifi_manager.c"
+        "web_config.c"
+    INCLUDE_DIRS
+        "."
+    REQUIRES
+        driver
+        esp_rom
+        nvs_flash
+        esp_wifi
+        esp_event
+        esp_netif
+        esp_http_client
+        esp_http_server
+)
