@@ -17,4 +17,5 @@ idf_component_register(
         esp_netif
         esp_http_client
         esp_http_server
+        u8g2
 )
