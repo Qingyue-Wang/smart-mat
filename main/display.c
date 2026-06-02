@@ -16,10 +16,13 @@
 #define OLED_CS GPIO_NUM_25
 
 #define OLED_WIDTH 128
-#define OLED_PROGRESS_Y 54
-#define OLED_PROGRESS_H 9
+#define OLED_PROGRESS_X 8
+#define OLED_PROGRESS_Y 34
+#define OLED_PROGRESS_W 112
+#define OLED_PROGRESS_H 14
 
 static u8g2_t s_u8g2;
+static float s_displayed_progress = 0.0f;
 
 static void oled_gpio_init(void)
 {
@@ -127,11 +130,11 @@ static void draw_progress_bar(float progress)
         progress = 1.0f;
     }
 
-    u8g2_DrawFrame(&s_u8g2, 0, OLED_PROGRESS_Y, OLED_WIDTH, OLED_PROGRESS_H);
+    u8g2_DrawFrame(&s_u8g2, OLED_PROGRESS_X, OLED_PROGRESS_Y, OLED_PROGRESS_W, OLED_PROGRESS_H);
 
-    uint8_t fill_width = (uint8_t)((OLED_WIDTH - 2) * progress);
+    uint8_t fill_width = (uint8_t)((OLED_PROGRESS_W - 2) * progress);
     if (fill_width > 0U) {
-        u8g2_DrawBox(&s_u8g2, 1, OLED_PROGRESS_Y + 1, fill_width, OLED_PROGRESS_H - 2);
+        u8g2_DrawBox(&s_u8g2, OLED_PROGRESS_X + 1, OLED_PROGRESS_Y + 1, fill_width, OLED_PROGRESS_H - 2);
     }
 }
 
@@ -143,6 +146,7 @@ void display_init(void)
     u8g2_SetPowerSave(&s_u8g2, 0);
     u8g2_ClearBuffer(&s_u8g2);
     u8g2_SendBuffer(&s_u8g2);
+    s_displayed_progress = 0.0f;
 }
 
 void display_show_boot(const char *line1, const char *line2)
@@ -158,33 +162,54 @@ void display_show_boot(const char *line1, const char *line2)
 void display_show_status(const app_status_t *status)
 {
     char line[32];
-    float progress = 0.0f;
+    float target_progress = 0.0f;
+    int progress_percent;
 
     if (status->target_ml > 0.0f) {
-        progress = status->total_drink_g / status->target_ml;
+        target_progress = status->total_drink_g / status->target_ml;
     }
+
+    if (target_progress < 0.0f) {
+        target_progress = 0.0f;
+    }
+    if (target_progress > 1.0f) {
+        target_progress = 1.0f;
+    }
+
+    if (target_progress > s_displayed_progress) {
+        float delta = target_progress - s_displayed_progress;
+        float step = delta * 0.28f;
+        if (step < 0.01f) {
+            step = 0.01f;
+        }
+        s_displayed_progress += step;
+        if (s_displayed_progress > target_progress) {
+            s_displayed_progress = target_progress;
+        }
+    } else {
+        s_displayed_progress = target_progress;
+    }
+
+    progress_percent = (int)(target_progress * 100.0f + 0.5f);
 
     u8g2_ClearBuffer(&s_u8g2);
 
-    u8g2_SetFont(&s_u8g2, u8g2_font_5x8_tf);
-    u8g2_DrawStr(&s_u8g2, 0, 8, status->remind ? "DRINK WATER!" : "SMART COASTER");
-    u8g2_DrawStr(&s_u8g2, 76, 8, status->time_text);
+    u8g2_SetFont(&s_u8g2, u8g2_font_logisoso24_tf);
+    u8g2_DrawStr(&s_u8g2, 12, 24, status->time_text);
 
-    u8g2_DrawStr(&s_u8g2, 0, 18, status->wifi_text);
-    u8g2_DrawStr(&s_u8g2, 0, 28, status->ip_text);
+    u8g2_SetFont(&s_u8g2, u8g2_font_5x8_tf);
+    if (status->remind) {
+        u8g2_DrawStr(&s_u8g2, 96, 10, "DRINK");
+    }
+
+    draw_progress_bar(s_displayed_progress);
 
     u8g2_SetFont(&s_u8g2, u8g2_font_6x12_tf);
-    snprintf(line, sizeof(line), "W:%4.0fg", status->weight_g);
-    u8g2_DrawStr(&s_u8g2, 0, 42, line);
-    snprintf(line, sizeof(line), "Cup:%s", status->cup_present ? "Y" : "N");
-    u8g2_DrawStr(&s_u8g2, 72, 42, line);
+    snprintf(line, sizeof(line), "%d%%", progress_percent);
+    u8g2_DrawStr(&s_u8g2, 8, 62, line);
 
-    u8g2_SetFont(&s_u8g2, u8g2_font_5x8_tf);
-    snprintf(line, sizeof(line), "L:%3.0f T:%4.0f", status->last_drink_g, status->total_drink_g);
-    u8g2_DrawStr(&s_u8g2, 0, 52, line);
-    snprintf(line, sizeof(line), "%lus", (unsigned long)status->next_reminder_s);
-    u8g2_DrawStr(&s_u8g2, 98, 52, line);
+    snprintf(line, sizeof(line), "%.0f/%.0f mL", status->total_drink_g, status->target_ml);
+    u8g2_DrawStr(&s_u8g2, 42, 62, line);
 
-    draw_progress_bar(progress);
     u8g2_SendBuffer(&s_u8g2);
 }
