@@ -16,8 +16,8 @@
 #define OLED_CS GPIO_NUM_25
 
 #define OLED_WIDTH 128
-#define OLED_PROGRESS_Y 52
-#define OLED_PROGRESS_H 10
+#define OLED_PROGRESS_Y 54
+#define OLED_PROGRESS_H 9
 
 static u8g2_t s_u8g2;
 
@@ -166,22 +166,24 @@ void display_show_status(const app_status_t *status)
 
     u8g2_ClearBuffer(&s_u8g2);
 
+    u8g2_SetFont(&s_u8g2, u8g2_font_5x8_tf);
+    u8g2_DrawStr(&s_u8g2, 0, 8, status->remind ? "DRINK WATER!" : "SMART COASTER");
+    u8g2_DrawStr(&s_u8g2, 76, 8, status->time_text);
+
+    u8g2_DrawStr(&s_u8g2, 0, 18, status->wifi_text);
+    u8g2_DrawStr(&s_u8g2, 0, 28, status->ip_text);
+
     u8g2_SetFont(&s_u8g2, u8g2_font_6x12_tf);
-    u8g2_DrawStr(&s_u8g2, 0, 10, status->remind ? "DRINK WATER!" : "SMART COASTER");
+    snprintf(line, sizeof(line), "W:%4.0fg", status->weight_g);
+    u8g2_DrawStr(&s_u8g2, 0, 42, line);
+    snprintf(line, sizeof(line), "Cup:%s", status->cup_present ? "Y" : "N");
+    u8g2_DrawStr(&s_u8g2, 72, 42, line);
 
     u8g2_SetFont(&s_u8g2, u8g2_font_5x8_tf);
-
-    snprintf(line, sizeof(line), "Cup:%s W:%5.0fg", status->cup_present ? "ON" : "OFF", status->weight_g);
-    u8g2_DrawStr(&s_u8g2, 0, 22, line);
-
-    snprintf(line, sizeof(line), "Last:%5.0fg", status->last_drink_g);
-    u8g2_DrawStr(&s_u8g2, 0, 32, line);
-
-    snprintf(line, sizeof(line), "Tot:%4.0fg T:%4.0f", status->total_drink_g, status->target_ml);
-    u8g2_DrawStr(&s_u8g2, 0, 42, line);
-
-    snprintf(line, sizeof(line), "%3lus", (unsigned long)status->next_reminder_s);
-    u8g2_DrawStr(&s_u8g2, 92, 32, line);
+    snprintf(line, sizeof(line), "L:%3.0f T:%4.0f", status->last_drink_g, status->total_drink_g);
+    u8g2_DrawStr(&s_u8g2, 0, 52, line);
+    snprintf(line, sizeof(line), "%lus", (unsigned long)status->next_reminder_s);
+    u8g2_DrawStr(&s_u8g2, 98, 52, line);
 
     draw_progress_bar(progress);
     u8g2_SendBuffer(&s_u8g2);

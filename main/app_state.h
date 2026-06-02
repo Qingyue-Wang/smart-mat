@@ -16,10 +16,16 @@
 typedef struct {
     bool cup_present;
     bool remind;
+    bool wifi_connected;
+    bool wifi_config_mode;
+    bool time_synced;
     float weight_g;
     float last_drink_g;
     float total_drink_g;
     float target_ml;
     uint32_t reminder_interval_ms;
     uint32_t next_reminder_s;
+    char wifi_text[24];
+    char ip_text[32];
+    char time_text[16];
 } app_status_t;
