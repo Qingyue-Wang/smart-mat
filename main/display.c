@@ -20,6 +20,8 @@
 #define OLED_PROGRESS_Y 34
 #define OLED_PROGRESS_W 112
 #define OLED_PROGRESS_H 14
+#define OLED_ANIMATION_FRAME_MS 35
+#define OLED_ANIMATION_MAX_STEPS 12
 
 static u8g2_t s_u8g2;
 static float s_displayed_progress = 0.0f;
@@ -138,6 +140,33 @@ static void draw_progress_bar(float progress)
     }
 }
 
+static void draw_status_frame(const app_status_t *status, float progress)
+{
+    char line[32];
+    int progress_percent = (int)(progress * 100.0f + 0.5f);
+
+    u8g2_ClearBuffer(&s_u8g2);
+
+    u8g2_SetFont(&s_u8g2, u8g2_font_logisoso24_tf);
+    u8g2_DrawStr(&s_u8g2, 12, 24, status->time_text);
+
+    u8g2_SetFont(&s_u8g2, u8g2_font_5x8_tf);
+    if (status->remind) {
+        u8g2_DrawStr(&s_u8g2, 96, 10, "DRINK");
+    }
+
+    draw_progress_bar(progress);
+
+    u8g2_SetFont(&s_u8g2, u8g2_font_6x12_tf);
+    snprintf(line, sizeof(line), "%d%%", progress_percent);
+    u8g2_DrawStr(&s_u8g2, 8, 62, line);
+
+    snprintf(line, sizeof(line), "%.0f/%.0f mL", status->total_drink_g, status->target_ml);
+    u8g2_DrawStr(&s_u8g2, 42, 62, line);
+
+    u8g2_SendBuffer(&s_u8g2);
+}
+
 void display_init(void)
 {
     u8g2_Setup_ssd1306_128x64_noname_f(
@@ -161,9 +190,8 @@ void display_show_boot(const char *line1, const char *line2)
 
 void display_show_status(const app_status_t *status)
 {
-    char line[32];
     float target_progress = 0.0f;
-    int progress_percent;
+    float start_progress;
 
     if (status->target_ml > 0.0f) {
         target_progress = status->total_drink_g / status->target_ml;
@@ -176,40 +204,28 @@ void display_show_status(const app_status_t *status)
         target_progress = 1.0f;
     }
 
-    if (target_progress > s_displayed_progress) {
-        float delta = target_progress - s_displayed_progress;
-        float step = delta * 0.28f;
-        if (step < 0.01f) {
-            step = 0.01f;
+    start_progress = s_displayed_progress;
+
+    if (target_progress > start_progress) {
+        float delta = target_progress - start_progress;
+        int steps = (int)(delta / 0.015f);
+
+        if (steps < 4) {
+            steps = 4;
         }
-        s_displayed_progress += step;
-        if (s_displayed_progress > target_progress) {
-            s_displayed_progress = target_progress;
+        if (steps > OLED_ANIMATION_MAX_STEPS) {
+            steps = OLED_ANIMATION_MAX_STEPS;
         }
-    } else {
-        s_displayed_progress = target_progress;
+
+        for (int i = 1; i <= steps; i++) {
+            float t = (float)i / (float)steps;
+            float eased = 1.0f - (1.0f - t) * (1.0f - t);
+            s_displayed_progress = start_progress + delta * eased;
+            draw_status_frame(status, s_displayed_progress);
+            vTaskDelay(pdMS_TO_TICKS(OLED_ANIMATION_FRAME_MS));
+        }
     }
 
-    progress_percent = (int)(target_progress * 100.0f + 0.5f);
-
-    u8g2_ClearBuffer(&s_u8g2);
-
-    u8g2_SetFont(&s_u8g2, u8g2_font_logisoso24_tf);
-    u8g2_DrawStr(&s_u8g2, 12, 24, status->time_text);
-
-    u8g2_SetFont(&s_u8g2, u8g2_font_5x8_tf);
-    if (status->remind) {
-        u8g2_DrawStr(&s_u8g2, 96, 10, "DRINK");
-    }
-
-    draw_progress_bar(s_displayed_progress);
-
-    u8g2_SetFont(&s_u8g2, u8g2_font_6x12_tf);
-    snprintf(line, sizeof(line), "%d%%", progress_percent);
-    u8g2_DrawStr(&s_u8g2, 8, 62, line);
-
-    snprintf(line, sizeof(line), "%.0f/%.0f mL", status->total_drink_g, status->target_ml);
-    u8g2_DrawStr(&s_u8g2, 42, 62, line);
-
-    u8g2_SendBuffer(&s_u8g2);
+    s_displayed_progress = target_progress;
+    draw_status_frame(status, s_displayed_progress);
 }
