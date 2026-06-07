@@ -12,6 +12,7 @@
 #define TCRT5000_DO GPIO_NUM_18
 #define TCRT5000_ACTIVE_LEVEL 0
 
+// 去皮后的零点偏移量，后续所有重量都以此为基准计算。
 static int32_t s_hx711_offset = 0;
 
 static bool hx711_is_ready(void)
@@ -23,10 +24,12 @@ static int32_t hx711_read_raw(void)
 {
     int32_t data = 0;
 
+    // HX711 的 DOUT 拉低后，表示这一轮 24 位数据已经准备好。
     while (!hx711_is_ready()) {
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 
+    // 按时序逐位读取 HX711 的 24 位原始数据。
     for (int i = 0; i < 24; i++) {
         gpio_set_level(HX711_SCK, 1);
         esp_rom_delay_us(1);
@@ -51,6 +54,7 @@ static int32_t hx711_read_average(int samples)
 {
     int64_t sum = 0;
 
+    // 通过多次采样平均降低瞬时波动。
     for (int i = 0; i < samples; i++) {
         sum += hx711_read_raw();
     }
@@ -60,6 +64,8 @@ static int32_t hx711_read_average(int samples)
 
 void sensors_init(void)
 {
+    // HX711 的 DOUT 和 TCRT5000 输出都是输入脚；
+    // HX711 的 SCK 作为输出脚提供读数时钟。
     gpio_config_t io_conf = {
         .pin_bit_mask = (1ULL << HX711_DOUT) | (1ULL << TCRT5000_DO),
         .mode = GPIO_MODE_INPUT,
@@ -78,6 +84,7 @@ void sensors_init(void)
 
 void sensors_tare(void)
 {
+    // 去皮时记录空载偏移量，后续重量都减去这个基准。
     s_hx711_offset = hx711_read_average(10);
 }
 
@@ -94,10 +101,13 @@ int32_t sensors_get_offset(void)
 float sensors_get_weight_grams(int samples)
 {
     int32_t raw = hx711_read_average(samples);
+
+    // 原始值减去零点偏移，再按校准系数换算成克。
     return (raw - s_hx711_offset) / HX711_COUNTS_PER_GRAM;
 }
 
 bool sensors_has_cup(void)
 {
+    // TCRT5000 这里只作为杯子在位检测，不参与重量计算。
     return gpio_get_level(TCRT5000_DO) == TCRT5000_ACTIVE_LEVEL;
 }

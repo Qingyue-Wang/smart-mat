@@ -4,6 +4,7 @@
 
 #include "app_state.h"
 
+// 网页配置模块：负责 HTTP 配置页、参数存储和 WiFi 配置交接。
 typedef float (*web_getter_t)(void);
 typedef void (*web_setter_t)(float value);
 typedef uint32_t (*web_u32_getter_t)(void);

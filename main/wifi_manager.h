@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+// WiFi 管理模块：负责 STA 联网、SoftAP 配网、IP 获取和时间同步。
 void wifi_manager_init(void);
 bool wifi_manager_connect_sta(const char *ssid, const char *password, uint32_t timeout_ms);
 void wifi_manager_start_ap(const char *ssid, const char *password);

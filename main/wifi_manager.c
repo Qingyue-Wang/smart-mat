@@ -17,6 +17,7 @@
 #define WIFI_DISCONNECTED_BIT BIT1
 
 static const char *TAG = "wifi_manager";
+// 事件组用于等待联网成功或失败，避免主流程盲等。
 static EventGroupHandle_t s_wifi_events;
 static esp_netif_t *s_sta_netif = NULL;
 static esp_netif_t *s_ap_netif = NULL;
@@ -31,6 +32,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
 {
     (void)arg;
 
+    // STA 断开、AP 启停、STA 获取 IP 都在这里统一更新状态。
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         s_wifi_connected = false;
         s_time_synced = false;
@@ -72,6 +74,7 @@ void wifi_manager_init(void)
 {
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
 
+    // 只初始化一次网络栈、事件循环和 WiFi 驱动。
     if (s_initialized) {
         return;
     }
@@ -94,6 +97,7 @@ void wifi_manager_init(void)
 
 static void wifi_manager_clear_state(void)
 {
+    // 清空运行期状态，避免 STA/AP 模式切换时残留旧信息。
     s_wifi_connected = false;
     s_ap_mode = false;
     s_time_synced = false;
@@ -124,6 +128,7 @@ bool wifi_manager_connect_sta(const char *ssid, const char *password, uint32_t t
         return false;
     }
 
+    // 进入 STA 模式前先停掉当前 WiFi，保证 AP 和 STA 不混用。
     wifi_manager_stop();
     wifi_manager_clear_state();
 
@@ -138,6 +143,7 @@ bool wifi_manager_connect_sta(const char *ssid, const char *password, uint32_t t
 
     ESP_LOGI(TAG, "Connecting to WiFi SSID: %s", ssid);
 
+    // 等待联网结果，超时则认为这次连接失败。
     bits = xEventGroupWaitBits(
         s_wifi_events,
         WIFI_CONNECTED_BIT | WIFI_DISCONNECTED_BIT,
@@ -169,6 +175,7 @@ void wifi_manager_start_ap(const char *ssid, const char *password)
         return;
     }
 
+    // 进入 AP 配网前同样先清掉当前 WiFi 运行状态。
     wifi_manager_stop();
     wifi_manager_clear_state();
 
@@ -214,6 +221,7 @@ bool wifi_manager_sync_time(uint32_t timeout_ms)
         return false;
     }
 
+    // 通过 SNTP 从网络获取当前时间，供 OLED 显示和业务使用。
     setenv("TZ", "CST-8", 1);
     tzset();
 
@@ -252,6 +260,7 @@ void wifi_manager_get_time_string(char *buffer, size_t buffer_size)
     }
 
     if (!s_time_synced) {
+        // 没对时成功时，用占位文本代替真实时间。
         snprintf(buffer, buffer_size, "--:--");
         return;
     }

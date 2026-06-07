@@ -17,6 +17,7 @@
 
 static const char *TAG = "web_config";
 
+// 这些回调用于把网页配置和主业务状态连接起来。
 static web_getter_t s_get_target_ml;
 static web_setter_t s_set_target_ml;
 static web_getter_t s_get_total_drink_g;
@@ -45,6 +46,7 @@ static int hex_value(char c)
 
 static void url_decode(char *text)
 {
+    // 表单提交的是 URL 编码文本，这里先还原成正常字符串。
     char *src = text;
     char *dst = text;
 
@@ -79,6 +81,7 @@ static int find_form_value(const char *body, const char *key, char *out, size_t 
     }
 
     start += strlen(key);
+    // 从 application/x-www-form-urlencoded 文本中提取指定字段。
     while (start[i] != '\0' && start[i] != '&' && i < out_size - 1U) {
         out[i] = start[i];
         i++;
@@ -108,6 +111,7 @@ static esp_err_t root_get_handler(httpd_req_t *req)
         progress = 100;
     }
 
+    // 根据当前运行模式生成网页：局域网页或 AP 配网页复用同一个页面模板。
     snprintf(
         html,
         sizeof(html),
@@ -157,6 +161,7 @@ static esp_err_t settings_post_handler(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "invalid body");
     }
 
+    // 从网页表单中读取目标饮水量、提醒间隔以及 WiFi 参数。
     if (!find_form_value(content, "target_ml=", target_buf, sizeof(target_buf))) {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing target_ml");
     }
@@ -187,6 +192,7 @@ static esp_err_t settings_post_handler(httpd_req_t *req)
 
     if (ssid_buf[0] != '\0') {
         web_config_save_wifi(ssid_buf, password_buf);
+        // 只有 AP 配网模式下，新的 WiFi 配置才会触发切回 STA 重连。
         if (s_config_mode) {
             snprintf(s_pending_ssid, sizeof(s_pending_ssid), "%s", ssid_buf);
             snprintf(s_pending_password, sizeof(s_pending_password), "%s", password_buf);
@@ -225,6 +231,7 @@ void web_config_start_server(bool config_mode)
     s_has_pending_wifi = false;
     s_pending_ssid[0] = '\0';
     s_pending_password[0] = '\0';
+    // 配网页 HTML 较大，适当增大 HTTP 任务栈，避免访问首页时栈不足。
     config.stack_size = 8192;
     ESP_ERROR_CHECK(httpd_start(&s_server, &config));
     ESP_ERROR_CHECK(httpd_register_uri_handler(s_server, &root));
@@ -250,6 +257,7 @@ void web_config_init(web_getter_t get_target_ml,
                      web_u32_setter_t set_reminder_interval_ms,
                      web_action_t reset_total_drink)
 {
+    // 保存主业务层注册进来的回调函数。
     s_get_target_ml = get_target_ml;
     s_set_target_ml = set_target_ml;
     s_get_total_drink_g = get_total_drink_g;
@@ -263,6 +271,7 @@ float web_config_load_target_ml(void)
     nvs_handle_t nvs_handle;
     float target_ml = DEFAULT_TARGET_ML;
 
+    // 目标饮水量保存在 NVS 中，掉电后仍可恢复。
     if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs_handle) == ESP_OK) {
         size_t required_size = sizeof(target_ml);
         if (nvs_get_blob(nvs_handle, NVS_KEY_TARGET, &target_ml, &required_size) != ESP_OK) {
@@ -324,6 +333,7 @@ bool web_config_load_wifi(char *ssid, size_t ssid_size, char *password, size_t p
         password[0] = '\0';
     }
 
+    // 启动时优先从 NVS 中恢复上次保存的 WiFi。
     if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs_handle) == ESP_OK) {
         size_t required_size = ssid_size;
         if (ssid != NULL && ssid_size > 0U &&
@@ -359,6 +369,7 @@ void web_config_save_wifi(const char *ssid, const char *password)
 
 bool web_config_consume_wifi_update(char *ssid, size_t ssid_size, char *password, size_t password_size)
 {
+    // AP 配网完成后，主流程通过这个接口取走一次性的新 WiFi 配置。
     if (!s_has_pending_wifi) {
         return false;
     }

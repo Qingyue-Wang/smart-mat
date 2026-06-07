@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+// 下面这些宏决定了称重换算、稳定判断和提醒策略的核心参数。
 #define HX711_COUNTS_PER_GRAM 421.84f
 #define CUP_PRESENT_MIN_G 30.0f
 #define DRINK_VALID_MIN_G 5.0f
@@ -13,6 +14,7 @@
 #define REMINDER_INTERVAL_MIN_SCALE 0.5f
 #define REMINDER_INTERVAL_MAX_SCALE 2.0f
 
+// 这个结构体用于收集当前一帧要显示/打印的运行状态。
 typedef struct {
     bool cup_present;
     bool remind;

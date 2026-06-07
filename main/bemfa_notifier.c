@@ -13,6 +13,7 @@ static const char *BEMFA_WARN_URL = "http://apis.bemfa.com/vb/wechat/v1/wechatWa
 static bool bemfa_send_message(const char *message)
 {
     char body[384];
+    // 通过 HTTP POST 调用巴法云接口，让微信收到提醒消息。
     esp_http_client_config_t config = {
         .url = BEMFA_WARN_URL,
         .method = HTTP_METHOD_POST,
@@ -54,6 +55,7 @@ bool bemfa_notifier_send_reminder(float total_drink_g, float target_ml, unsigned
 {
     char message[192];
 
+    // 这里只保留提醒信息，不再推送每次喝水的详细记录。
     snprintf(message, sizeof(message),
              "Time to drink water. Total %.0f mL, target %.0f mL, interval %u min.",
              total_drink_g, target_ml, interval_minutes);
